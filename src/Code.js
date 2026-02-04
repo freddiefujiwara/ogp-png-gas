@@ -1,4 +1,4 @@
-function doGet(e) {
+export function doGet(e) {
   // 1. パラメータからタイトルを取得
   const title = e.parameter.t || "No Title";
   
