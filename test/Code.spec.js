@@ -90,8 +90,8 @@ describe('Code.js', () => {
 
       expect(mockFile.setTrashed).toHaveBeenCalledWith(true);
       expect(Utilities.base64Encode).toHaveBeenCalledWith([1, 2, 3]);
-      expect(ContentService.createTextOutput).toHaveBeenCalledWith('mock-base64');
-      expect(mockOutput.setMimeType).toHaveBeenCalledWith('TEXT_MIME_TYPE');
+      expect(ContentService.createTextOutput).toHaveBeenCalledWith(JSON.stringify({ png: 'mock-base64' }));
+      expect(mockOutput.setMimeType).toHaveBeenCalledWith('JSON_MIME_TYPE');
       expect(result).toBe(mockOutput);
     });
 

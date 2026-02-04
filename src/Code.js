@@ -20,8 +20,9 @@ export function doGet(e) {
 
   try {
     const base64Image = generateOgpImage(title);
-    return ContentService.createTextOutput(base64Image)
-      .setMimeType(ContentService.MimeType.TEXT);
+    const output = JSON.stringify({ png: base64Image });
+    return ContentService.createTextOutput(output)
+      .setMimeType(ContentService.MimeType.JSON);
   } catch (error) {
     console.error('Failed to generate OGP image:', error);
     return ContentService.createTextOutput(JSON.stringify({
