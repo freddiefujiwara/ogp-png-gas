@@ -57,7 +57,13 @@ describe('Code.js', () => {
       createTextOutput: vi.fn().mockReturnValue(mockOutput),
       MimeType: {
         TEXT: 'TEXT_MIME_TYPE',
+        JSON: 'JSON_MIME_TYPE',
       },
+    });
+
+    // Mock console.error to avoid cluttering test output
+    vi.stubGlobal('console', {
+      error: vi.fn(),
     });
   });
 
@@ -97,6 +103,30 @@ describe('Code.js', () => {
       Code.doGet(e);
 
       expect(mockSlide.replaceAllText).toHaveBeenCalledWith('{{title}}', 'No Title');
+    });
+
+    it('should handle errors and return error JSON', () => {
+      const e = {
+        parameter: { t: 'Error Test' }
+      };
+
+      // Simulate an error in UrlFetchApp.fetch
+      UrlFetchApp.fetch.mockImplementation(() => {
+        throw new Error('Network error');
+      });
+
+      const result = Code.doGet(e);
+
+      expect(console.error).toHaveBeenCalled();
+      expect(mockFile.setTrashed).toHaveBeenCalledWith(true); // Ensure cleanup still happens
+      expect(ContentService.createTextOutput).toHaveBeenCalledWith(expect.stringContaining('Network error'));
+      expect(mockOutput.setMimeType).toHaveBeenCalledWith('JSON_MIME_TYPE');
+      expect(result).toBe(mockOutput);
+    });
+
+    it('should handle missing event object gracefully', () => {
+        Code.doGet(null);
+        expect(mockSlide.replaceAllText).toHaveBeenCalledWith('{{title}}', 'No Title');
     });
   });
 });
