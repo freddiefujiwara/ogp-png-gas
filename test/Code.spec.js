@@ -128,5 +128,22 @@ describe('Code.js', () => {
         Code.doGet(null);
         expect(mockSlide.replaceAllText).toHaveBeenCalledWith('{{title}}', 'No Title');
     });
+
+    it('should replace newlines with spaces and truncate long titles', () => {
+      const longTitleWithNewlines = 'This is a very long title\nthat contains newlines and should be truncated because it exceeds sixty six weighted characters limit definitely.';
+      const e = {
+        parameter: {
+          t: longTitleWithNewlines
+        }
+      };
+
+      Code.doGet(e);
+
+      // "This is a very long title that contains newlines and should be t" is 64 chars
+      // "This is a very long title that contains newlines and should be tr" is 65 chars
+      // "This is a very long title that contains newlines and should be tru" is 66 chars
+      const expectedTitle = 'This is a very long title that contains newlines and should be tru';
+      expect(mockSlide.replaceAllText).toHaveBeenCalledWith('{{title}}', expectedTitle);
+    });
   });
 });
