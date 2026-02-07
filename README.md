@@ -48,6 +48,10 @@ If something goes wrong, it returns an error message.
 }
 ```
 
+## API Specification
+
+OpenAPI definition is available at `openapi.yaml` in the repository root.
+
 ## Development
 
 ### Setup
