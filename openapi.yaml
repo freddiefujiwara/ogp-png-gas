@@ -1,0 +1,61 @@
+openapi: 3.0.3
+info:
+  title: OGP Generator API
+  description: |-
+    Google Apps Script Web App that generates OGP images from a Google Slides template.
+    The endpoint returns a JSON response containing a base64-encoded PNG.
+  version: 1.0.0
+servers:
+  - url: https://script.google.com/macros/s/AKfycbzbMAKxkzHlwN8SY7ygJA34xYESMNNdkGNt8vv1XMcZSksgHsUwOxCCdP-wgg6fv7M
+    description: Google Apps Script Web App deployment
+paths:
+  /exec:
+    get:
+      summary: Generate an OGP image
+      description: Generates an OGP image from the provided title.
+      parameters:
+        - name: t
+          in: query
+          description: Title text to render in the OGP image.
+          required: false
+          schema:
+            type: string
+          example: Your Title Here
+      responses:
+        "200":
+          description: Base64-encoded PNG response.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  png:
+                    type: string
+                    description: Base64-encoded PNG image.
+                required:
+                  - png
+              examples:
+                success:
+                  summary: Successful response
+                  value:
+                    png: iVBORw0KGgoAAAANSUhEUgAA...
+        "500":
+          description: Error response when image generation fails.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  details:
+                    type: string
+                required:
+                  - error
+                  - details
+              examples:
+                failure:
+                  summary: Failure response
+                  value:
+                    error: Failed to generate image
+                    details: Error message here
