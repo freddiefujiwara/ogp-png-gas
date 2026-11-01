@@ -13,7 +13,7 @@ Send a GET request to the Web App URL with a `t` parameter for the title.
 You can generate and save the PNG image directly from your terminal using `curl` and `jq`:
 
 ```bash
-JSON_RESPONSE=$(curl -L -s "https://script.google.com/macros/s/AKfycbzbMAKxkzHlwN8SY7ygJA34xYESMNNdkGNt8vv1XMcZSksgHsUwOxCCdP-wgg6fv7M/exec?t=Your+Text")
+JSON_RESPONSE=$(curl -L -s "https://script.google.com/macros/s/.../exec?t=Your+Text")
 echo $JSON_RESPONSE | jq -r '.png' | base64 -d > ogp.png
 ```
 
