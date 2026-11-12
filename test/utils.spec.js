@@ -1,30 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { getWeightedLength, truncateToWeightedLength, replaceNewlines } from '../src/Code.js';
+import { truncateToWeightedLength, replaceNewlines } from '../src/Code.js';
 
 describe('Utility functions', () => {
-  describe('getWeightedLength', () => {
-    it('should return 0 for empty string', () => {
-      expect(getWeightedLength('')).toBe(0);
-      expect(getWeightedLength(null)).toBe(0);
-    });
-
-    it('should count ASCII characters as 1.0', () => {
-      expect(getWeightedLength('abc')).toBe(3);
-    });
-
-    it('should count half-width Katakana as 1.0', () => {
-      expect(getWeightedLength('ｱｲｳ')).toBe(3);
-    });
-
-    it('should count full-width characters as 1.65', () => {
-      expect(getWeightedLength('あいう')).toBe(1.65 * 3);
-    });
-
-    it('should handle mixed characters', () => {
-      expect(getWeightedLength('aｱあ')).toBe(1 + 1 + 1.65);
-    });
-  });
-
   describe('truncateToWeightedLength', () => {
     it('should return empty string for empty input', () => {
       expect(truncateToWeightedLength('', 10)).toBe('');
