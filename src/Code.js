@@ -23,8 +23,19 @@ export function doGet(e) {
   title = truncateToWeightedLength(title, 66);
 
   try {
-    const base64Image = generateOgpImage(title);
-    const output = JSON.stringify({ png: base64Image });
+    const templateFile = DriveApp.getFileById(CONFIG.TEMPLATE_ID);
+    // Rendering is expensive (a Slides copy, an open and an export per
+    // call) and this endpoint is anonymous, so repeat titles — the CI
+    // callers ask for the same handful of app names on every run — are
+    // served from a Drive cache next to the template instead.
+    const cached = readCachedImage_(templateFile, title);
+    if (cached) {
+      return ContentService.createTextOutput(JSON.stringify({ png: cached }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    const blob = generateOgpImage(templateFile, title);
+    writeCachedImage_(templateFile, title, blob);
+    const output = JSON.stringify({ png: Utilities.base64Encode(blob.getBytes()) });
     return ContentService.createTextOutput(output)
       .setMimeType(ContentService.MimeType.JSON);
   } catch (error) {
@@ -36,14 +47,50 @@ export function doGet(e) {
   }
 }
 
+const titleCacheFileName_ = (title) => {
+  const digest = Utilities.computeDigest(
+    Utilities.DigestAlgorithm.SHA_256,
+    title,
+    Utilities.Charset.UTF_8
+  );
+  const hex = digest
+    .map((b) => ('0' + (b & 0xff).toString(16)).slice(-2))
+    .join('');
+  return `ogp-cache-${hex}.png`;
+};
+
+// Both cache helpers are best-effort: any Drive hiccup falls back to a
+// fresh render (read) or is simply skipped (write).
+function readCachedImage_(templateFile, title) {
+  try {
+    const parents = templateFile.getParents();
+    if (!parents.hasNext()) return null;
+    const files = parents.next().getFilesByName(titleCacheFileName_(title));
+    if (!files.hasNext()) return null;
+    return Utilities.base64Encode(files.next().getBlob().getBytes());
+  } catch (e) {
+    return null;
+  }
+}
+
+function writeCachedImage_(templateFile, title, blob) {
+  try {
+    const parents = templateFile.getParents();
+    if (!parents.hasNext()) return;
+    parents.next().createFile(blob.setName(titleCacheFileName_(title)));
+  } catch (e) {
+    /* cache is best-effort */
+  }
+}
+
 /**
  * Generates an OGP image from a Google Slides template.
  *
+ * @param {GoogleAppsScript.Drive.File} templateFile - The template file
  * @param {string} title - The title to replace in the template
- * @returns {string} Base64 encoded PNG image
+ * @returns {GoogleAppsScript.Base.Blob} The PNG blob
  */
-function generateOgpImage(title) {
-  const templateFile = DriveApp.getFileById(CONFIG.TEMPLATE_ID);
+function generateOgpImage(templateFile, title) {
   const tempFile = templateFile.makeCopy(CONFIG.TEMP_FILE_NAME);
   const tempId = tempFile.getId();
 
@@ -61,9 +108,7 @@ function generateOgpImage(title) {
       headers: { Authorization: "Bearer " + ScriptApp.getOAuthToken() }
     };
     const response = UrlFetchApp.fetch(url, options);
-    const blob = response.getBlob().setName(CONFIG.OUTPUT_FILE_NAME);
-
-    return Utilities.base64Encode(blob.getBytes());
+    return response.getBlob().setName(CONFIG.OUTPUT_FILE_NAME);
   } finally {
     // Ensure the temporary file is deleted even if an error occurs
     tempFile.setTrashed(true);

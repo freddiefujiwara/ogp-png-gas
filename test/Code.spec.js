@@ -129,6 +129,53 @@ describe('Code.js', () => {
         expect(mockSlide.replaceAllText).toHaveBeenCalledWith('{{title}}', 'No Title');
     });
 
+    it('serves a repeated title from the Drive cache without rendering', () => {
+      const cachedFile = {
+        getBlob: vi.fn().mockReturnValue({ getBytes: vi.fn().mockReturnValue([9, 9, 9]) }),
+      };
+      const folder = {
+        getFilesByName: vi.fn().mockReturnValue({ hasNext: () => true, next: () => cachedFile }),
+        createFile: vi.fn(),
+      };
+      const template = {
+        makeCopy: vi.fn(),
+        getParents: vi.fn().mockReturnValue({ hasNext: () => true, next: () => folder }),
+      };
+      DriveApp.getFileById.mockReturnValue(template);
+      Utilities.computeDigest = vi.fn().mockReturnValue([1, 2, 3]);
+      Utilities.DigestAlgorithm = { SHA_256: 'SHA_256' };
+      Utilities.Charset = { UTF_8: 'UTF_8' };
+      Utilities.base64Encode.mockReturnValue('cached-base64');
+
+      Code.doGet({ parameter: { t: 'Test Title' } });
+
+      expect(folder.getFilesByName).toHaveBeenCalledWith('ogp-cache-010203.png');
+      expect(template.makeCopy).not.toHaveBeenCalled();
+      expect(SlidesApp.openById).not.toHaveBeenCalled();
+      expect(ContentService.createTextOutput).toHaveBeenCalledWith(
+        JSON.stringify({ png: 'cached-base64' })
+      );
+    });
+
+    it('renders on a cache miss and stores the result in the cache', () => {
+      const folder = {
+        getFilesByName: vi.fn().mockReturnValue({ hasNext: () => false, next: () => null }),
+        createFile: vi.fn(),
+      };
+      mockFile.getParents = vi.fn().mockReturnValue({ hasNext: () => true, next: () => folder });
+      Utilities.computeDigest = vi.fn().mockReturnValue([1, 2, 3]);
+      Utilities.DigestAlgorithm = { SHA_256: 'SHA_256' };
+      Utilities.Charset = { UTF_8: 'UTF_8' };
+
+      Code.doGet({ parameter: { t: 'Test Title' } });
+
+      expect(mockFile.makeCopy).toHaveBeenCalledWith('temp_ogp');
+      expect(folder.createFile).toHaveBeenCalled();
+      expect(ContentService.createTextOutput).toHaveBeenCalledWith(
+        JSON.stringify({ png: 'mock-base64' })
+      );
+    });
+
     it('should replace newlines with spaces and truncate long titles', () => {
       const longTitleWithNewlines = 'This is a very long title\nthat contains newlines and should be truncated because it exceeds sixty six weighted characters limit definitely.';
       const e = {
