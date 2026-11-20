@@ -122,15 +122,24 @@ function generateOgpImage(templateFile, title) {
  * @returns {string}
  */
 export function truncateToWeightedLength(str, maxWeight) {
-  if (!str) return '';
+  if (typeof str !== 'string') return '';
+  // A non-numeric limit used to leak text past the intended bound
+  // ('3' + 0.0001 concatenates to '30.0001'; true acts as 1.0001).
+  const limit = (typeof maxWeight === 'number' && !Number.isNaN(maxWeight)) ? maxWeight : 0;
   let currentWeight = 0;
   let result = '';
-  for (let i = 0; i < str.length; i++) {
-    const char = str[i];
-    const charCode = char.charCodeAt(0);
-    const weight = ((charCode >= 0x0000 && charCode <= 0x007F) || (charCode >= 0xFF61 && charCode <= 0xFF9F)) ? 1 : 1.65;
+  // Iterate by code point: a per-code-unit loop can keep the high half
+  // of a surrogate pair whose low half no longer fits, emitting a lone
+  // surrogate. A pair is taken whole (at its combined weight) or not
+  // at all; weights per code unit are unchanged.
+  for (const char of str) {
+    let weight = 0;
+    for (let i = 0; i < char.length; i++) {
+      const charCode = char.charCodeAt(i);
+      weight += ((charCode >= 0x0000 && charCode <= 0x007F) || (charCode >= 0xFF61 && charCode <= 0xFF9F)) ? 1 : 1.65;
+    }
 
-    if (currentWeight + weight <= maxWeight + 0.0001) { // Add small epsilon for floating point comparison
+    if (currentWeight + weight <= limit + 0.0001) { // Add small epsilon for floating point comparison
       result += char;
       currentWeight += weight;
     } else {
@@ -146,6 +155,6 @@ export function truncateToWeightedLength(str, maxWeight) {
  * @returns {string}
  */
 export function replaceNewlines(str) {
-  if (!str) return '';
+  if (typeof str !== 'string') return '';
   return str.replace(/\r?\n/g, ' ');
 }
