@@ -5,7 +5,10 @@ const CONFIG = {
   TEMPLATE_ID: "19WVKprEJMvo0IRMY2oDEiv0yTnJRq17JpHuDSTAm-ww",
   TEMP_FILE_NAME: "temp_ogp",
   OUTPUT_FILE_NAME: "ogp.png",
-  PLACEHOLDER: "{{title}}"
+  PLACEHOLDER: "{{title}}",
+  // Cache files live in this subfolder of the template's folder, so
+  // they do not pile up next to the template itself.
+  CACHE_FOLDER_NAME: "ogp-png-gas"
 };
 
 /**
@@ -27,7 +30,7 @@ export function doGet(e) {
     // Rendering is expensive (a Slides copy, an open and an export per
     // call) and this endpoint is anonymous, so repeat titles — the CI
     // callers ask for the same handful of app names on every run — are
-    // served from a Drive cache next to the template instead.
+    // served from a Drive cache in a subfolder next to the template.
     const cached = readCachedImage_(templateFile, title);
     if (cached) {
       return ContentService.createTextOutput(JSON.stringify({ png: cached }))
@@ -59,15 +62,33 @@ const titleCacheFileName_ = (title) => {
   return `ogp-cache-${hex}.png`;
 };
 
+// The cache folder is the CACHE_FOLDER_NAME subfolder of the folder
+// that holds the template. Reads also check the parent folder itself,
+// where cache files lived before the subfolder was introduced, so
+// existing entries keep hitting. Writes always go to the subfolder,
+// creating it on first use.
+function cacheFolder_(parent, create) {
+  const folders = parent.getFoldersByName(CONFIG.CACHE_FOLDER_NAME);
+  if (folders.hasNext()) return folders.next();
+  return create ? parent.createFolder(CONFIG.CACHE_FOLDER_NAME) : null;
+}
+
+function findCacheFile_(folder, title) {
+  const files = folder.getFilesByName(titleCacheFileName_(title));
+  return files.hasNext() ? files.next() : null;
+}
+
 // Both cache helpers are best-effort: any Drive hiccup falls back to a
 // fresh render (read) or is simply skipped (write).
 function readCachedImage_(templateFile, title) {
   try {
     const parents = templateFile.getParents();
     if (!parents.hasNext()) return null;
-    const files = parents.next().getFilesByName(titleCacheFileName_(title));
-    if (!files.hasNext()) return null;
-    return Utilities.base64Encode(files.next().getBlob().getBytes());
+    const parent = parents.next();
+    const subfolder = cacheFolder_(parent, false);
+    const file = (subfolder && findCacheFile_(subfolder, title)) || findCacheFile_(parent, title);
+    if (!file) return null;
+    return Utilities.base64Encode(file.getBlob().getBytes());
   } catch (e) {
     return null;
   }
@@ -77,7 +98,9 @@ function writeCachedImage_(templateFile, title, blob) {
   try {
     const parents = templateFile.getParents();
     if (!parents.hasNext()) return;
-    parents.next().createFile(blob.setName(titleCacheFileName_(title)));
+    const folder = cacheFolder_(parents.next(), true);
+    if (!folder) return;
+    folder.createFile(blob.setName(titleCacheFileName_(title)));
   } catch (e) {
     /* cache is best-effort */
   }
