@@ -133,8 +133,49 @@ describe('Code.js', () => {
       const cachedFile = {
         getBlob: vi.fn().mockReturnValue({ getBytes: vi.fn().mockReturnValue([9, 9, 9]) }),
       };
+      const subfolder = {
+        getFilesByName: vi.fn().mockReturnValue({ hasNext: () => true, next: () => cachedFile }),
+        createFile: vi.fn(),
+      };
+      const folder = {
+        getFilesByName: vi.fn().mockReturnValue({ hasNext: () => false, next: () => null }),
+        getFoldersByName: vi.fn().mockReturnValue({ hasNext: () => true, next: () => subfolder }),
+        createFolder: vi.fn(),
+        createFile: vi.fn(),
+      };
+      const template = {
+        makeCopy: vi.fn(),
+        getParents: vi.fn().mockReturnValue({ hasNext: () => true, next: () => folder }),
+      };
+      DriveApp.getFileById.mockReturnValue(template);
+      Utilities.computeDigest = vi.fn().mockReturnValue([1, 2, 3]);
+      Utilities.DigestAlgorithm = { SHA_256: 'SHA_256' };
+      Utilities.Charset = { UTF_8: 'UTF_8' };
+      Utilities.base64Encode.mockReturnValue('cached-base64');
+
+      Code.doGet({ parameter: { t: 'Test Title' } });
+
+      expect(folder.getFoldersByName).toHaveBeenCalledWith('ogp-png-gas');
+      expect(subfolder.getFilesByName).toHaveBeenCalledWith('ogp-cache-010203.png');
+      expect(template.makeCopy).not.toHaveBeenCalled();
+      expect(SlidesApp.openById).not.toHaveBeenCalled();
+      expect(ContentService.createTextOutput).toHaveBeenCalledWith(
+        JSON.stringify({ png: 'cached-base64' })
+      );
+    });
+
+    it('serves a title cached in the parent folder from before the subfolder existed', () => {
+      const cachedFile = {
+        getBlob: vi.fn().mockReturnValue({ getBytes: vi.fn().mockReturnValue([9, 9, 9]) }),
+      };
+      const subfolder = {
+        getFilesByName: vi.fn().mockReturnValue({ hasNext: () => false, next: () => null }),
+        createFile: vi.fn(),
+      };
       const folder = {
         getFilesByName: vi.fn().mockReturnValue({ hasNext: () => true, next: () => cachedFile }),
+        getFoldersByName: vi.fn().mockReturnValue({ hasNext: () => true, next: () => subfolder }),
+        createFolder: vi.fn(),
         createFile: vi.fn(),
       };
       const template = {
@@ -151,15 +192,20 @@ describe('Code.js', () => {
 
       expect(folder.getFilesByName).toHaveBeenCalledWith('ogp-cache-010203.png');
       expect(template.makeCopy).not.toHaveBeenCalled();
-      expect(SlidesApp.openById).not.toHaveBeenCalled();
       expect(ContentService.createTextOutput).toHaveBeenCalledWith(
         JSON.stringify({ png: 'cached-base64' })
       );
     });
 
-    it('renders on a cache miss and stores the result in the cache', () => {
+    it('renders on a cache miss and stores the result in the cache subfolder, creating it first', () => {
+      const subfolder = {
+        getFilesByName: vi.fn().mockReturnValue({ hasNext: () => false, next: () => null }),
+        createFile: vi.fn(),
+      };
       const folder = {
         getFilesByName: vi.fn().mockReturnValue({ hasNext: () => false, next: () => null }),
+        getFoldersByName: vi.fn().mockReturnValue({ hasNext: () => false, next: () => null }),
+        createFolder: vi.fn().mockReturnValue(subfolder),
         createFile: vi.fn(),
       };
       mockFile.getParents = vi.fn().mockReturnValue({ hasNext: () => true, next: () => folder });
@@ -170,7 +216,9 @@ describe('Code.js', () => {
       Code.doGet({ parameter: { t: 'Test Title' } });
 
       expect(mockFile.makeCopy).toHaveBeenCalledWith('temp_ogp');
-      expect(folder.createFile).toHaveBeenCalled();
+      expect(folder.createFolder).toHaveBeenCalledWith('ogp-png-gas');
+      expect(subfolder.createFile).toHaveBeenCalled();
+      expect(folder.createFile).not.toHaveBeenCalled();
       expect(ContentService.createTextOutput).toHaveBeenCalledWith(
         JSON.stringify({ png: 'mock-base64' })
       );
